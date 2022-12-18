@@ -5,7 +5,7 @@ library(tidyverse)
 library(readxl)
 
 # Working directory
-# setwd("~/Desktop/Side Data Projects/The Office")
+ setwd("~/Desktop/GitHub/The-Office")
 
 # Import Data
 
