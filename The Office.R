@@ -28,29 +28,93 @@ office <- office %>%
   select(season.x, episode_num_in_season, episode_num_overall, title.x,
          directed_by, written_by, original_air_date, us_viewers, total_votes, desc, imdb_rating)
 
-# Explore
-## by rating
-ggplot(office, aes(x = original_air_date, y = imdb_rating)) +
+# Determine which seasons are best rated by viewers
+### by rating
+office_summary <- office %>%
+  group_by(season.x) %>%
+  summarize(avg_rating = mean(imdb_rating),
+            avg_viewers = mean(us_viewers)
+            )
+            
+view(office_summary)
+
+ggplot(office_summary, aes(x = season.x, y = avg_rating, color = avg_rating)) +
   geom_line() +
-  labs(x = "Air Date",
+  labs(x = "Season",
        y = "IMDB Rating",
        title = "The Office Series Ratings",
        subtitle = "Season 1 - Season 9") +
-  geom_smooth(se = FALSE, color = "red") +
+  scale_x_discrete(limits = c("1", "2", "3", "4", "5", "6", "7", "8", "9")) +
   theme_minimal()
 
 ## by viewers
-ggplot(office, aes(x = original_air_date, y = us_viewers)) +
+ggplot(office_summary, aes(x = season.x, y = avg_viewers, color = avg_viewers)) +
   geom_line() +
-  labs(x = "Air Date",
-       y = "US Viewers",
+  labs(x = "Season",
+       y = "Avg US Viewers",
        title = "The Office Series Viewers",
        subtitle = "Season 1 - Season 9") +
-  geom_smooth(se = FALSE, color = "red") +
+  scale_x_discrete(limits = c("1", "2", "3", "4", "5", "6", "7", "8", "9")) +
   theme_minimal()
-### obvious outlier in 2009. Confirmed accurate data point. Episodes aired immediately
-###     following Super Bowl XLIII which increased viewers for the 2 part episode
 
+### On average, season 3 was rated the highest, though season 5 had the most viewers due to a 
+###   2 part episode airing immediately after Super Bowl XLIII, which significantly increased the avg.
+# =============================================================================
+# Michael Scott's impact to ratings and viewers
+
+## Michael Scott was the Regional Manager starting in season 1 and departed at the end of season 7
+## It's obvious from the previous section that ratings and viewers significantly decreased in season 8 & 9 when compared to
+##    the previous seasons, but can we confidently say it was due to Michael Scott's contract with the series ending?
+
+
+### Ratings
+ggplot(office_summary, aes(x = season.x, y = avg_rating, color = avg_rating)) +
+  geom_line() +
+  geom_point() +
+  labs(x = "Season",
+       y = "IMDB Rating",
+       title = "The Office Series Ratings",
+       subtitle = "Season 1 - Season 9 Average") +
+  scale_x_discrete(limits = c("1", "2", "3", "4", "5", "6", "7", "8", "9")) +
+  annotate("text", x = 1.8, y = 7.92, label = "Pilot Season") +
+  annotate("text", x = 8.2, y = 8.33, label = "Michael's Final Season") +
+  theme_minimal()
+  
+ggplot(office, aes(x = original_air_date, y = imdb_rating)) +
+  geom_line() +
+  geom_smooth(se = FALSE, color = "red") +
+  labs(title = "The Office Series Ratings by Episode",
+       subtitle = "Season 1 - Season 9", 
+       x = "Air Date", y = "IMDB Rating") +
+  theme_minimal()
+### There is a clear dip in the final season of the series where it reaches some of the highest ratings throughout the series
+
+## Separate season 9 to investigate the increased ratings
+season_9 <- office %>%
+  filter(season.x == 9)
+
+ggplot(season_9, aes(x = episode_num_in_season, y = imdb_rating)) +
+  geom_line() +
+  geom_point() # episodes 22/23 & 24/25 have the same ratings
+
+season_9[24:27, ] # 22/23 & 24/25 are 2-part episodes, which explain the ratings
+### The 2-part finale has the highest ratings of the season. This is also the episode where Michael Scott makes an appearance
+
+season_9_no_finale <- season_9 %>%
+  filter(episode_num_in_season <= 23) # remove finale (with Michael) to compare avg rating
+
+mean(season_9$imdb_rating) # 7.98
+mean(season_9_no_finale$imdb_rating) # 7.84
+(7.84 - 7.98) / 7.84
+### Avg rating drops by 0.14 (1%) when removing the episode without Michael Scott
+
+### Based on charts showing the drop in ratings once Michael left and the increase in ratings when 
+###  Michael made a cameo in the finale, I feel confident to conclude ratings were impacted by his departure
+
+
+## Viewers
+
+# =============================================================================
 office <- office %>% 
   mutate(recommend = if_else(imdb_rating > 8.0, "Yes", "No"))
 
@@ -100,9 +164,9 @@ seasons <- office %>%
 ggplot(seasons, aes(x = season.x, y = season_recommend_num)) +
   geom_line(color = "blue") +
   scale_x_discrete(limits = c("1", "2", "3", "4", "5", "6", "7", "8", "9")) +
-  annotate("text", x = 8.3, y = 0.65, 
+  annotate("text", x = 8.1, y = 0.66, 
            label = "Michael's Last Season") +
-  annotate("text", x = 1.8, y = 0.36, 
+  annotate("text", x = 1.6, y = 0.36, 
            label = "Pilot Season") +
   labs(title = "Avg Recommendation by Season",
        subtitle = "The Office",
