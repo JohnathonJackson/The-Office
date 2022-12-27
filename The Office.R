@@ -28,6 +28,7 @@ office <- office %>%
   select(season.x, episode_num_in_season, episode_num_overall, title.x,
          directed_by, written_by, original_air_date, us_viewers, total_votes, desc, imdb_rating)
 
+# =============================================================================
 # Determine which seasons are best rated by viewers
 ### by rating
 office_summary <- office %>%
@@ -81,7 +82,8 @@ ggplot(office_summary, aes(x = season.x, y = avg_rating, color = avg_rating)) +
   theme_minimal()
   
 ggplot(office, aes(x = original_air_date, y = imdb_rating)) +
-  geom_line() +
+  geom_line(aes(color = season.x)) +
+  scale_color_identity() +
   geom_smooth(se = FALSE, color = "red") +
   labs(title = "The Office Series Ratings by Episode",
        subtitle = "Season 1 - Season 9", 
@@ -113,6 +115,68 @@ mean(season_9_no_finale$imdb_rating) # 7.84
 
 
 ## Viewers
+ggplot(office_summary, aes(x = season.x, y = avg_viewers, color = avg_viewers)) +
+  geom_line() +
+  geom_point() +
+  labs(x = "Season",
+       y = "Avg Viewers",
+       title = "The Office Series Viewers",
+       subtitle = "Season 1 - Season 9 Average") +
+  scale_x_discrete(limits = c("1", "2", "3", "4", "5", "6", "7", "8", "9")) +
+  annotate("text", x = 1.8, y = 6366667, label = "Pilot Season") +
+  annotate("text", x = 8.2, y = 7300385, label = "Michael's Final Season") +
+  theme_minimal()
+### average viewers experience a steady decrease starting in season 5, though a significant
+###   decrease from season 7 though 9
+
+office_summary <- office_summary %>%
+  mutate(difference = avg_viewers-lag(avg_viewers, default = first(avg_viewers))) %>% # calculate value change season over season
+  mutate(pct_change = (avg_viewers - lag(avg_viewers)) / avg_viewers * 100) # calculate % change season over season
+
+ggplot(office_summary, aes(x = season.x, y = pct_change, fill = pct_change)) +
+  geom_col() +
+  scale_x_discrete(limits = c("1", "2", "3", "4", "5", "6", "7", "8", "9")) +
+  labs(title = "The Office",
+       subtitle = "Percent Change in Viewers Season over Season",
+       x = "Season", y = "% Change") +
+  theme_minimal()
+### season 8 (36%) and season 9 (28%) experience the largest change in viewership throughout the series
+
+## individual episode view
+ggplot(office, aes(x = original_air_date, y = us_viewers)) +
+  geom_line(aes(color = season.x)) +
+  scale_color_identity() + 
+  theme_minimal() 
+### Outlier in season 5 due to episodes following the super bowl
+
+office_no_stress <- office %>%
+  filter(title.x !="Stress Relief") # removed the outlier to get a better view of the data
+
+ggplot(office_no_stress, aes(x = original_air_date, y = us_viewers)) +
+  geom_line(aes(color = season.x)) +
+  scale_color_identity() + 
+  geom_smooth(se = FALSE, color = "red") +
+  labs(title = "The Office Season Viewers",
+       subtitle = "Season 1 - 9 (minus Stres Relief)", 
+       x = "Air Date", y = "US Viewers") +
+  theme_minimal() 
+### Similar to what we saw with ratings, there is an obvious jump in the final season after a consistent downward trend
+
+ggplot(season_9, aes(x = episode_num_in_season, y = us_viewers)) + 
+  geom_line() +
+  geom_point() +
+  labs(title = "The Office Season 9 Viewers",
+       x = "Episode Number", y = "US Viewers") +
+  theme_minimal()
+### the final two episodes are the highest of the season, which are the episodes Michael Scott makes a cameo
+
+mean(season_9$us_viewers) # 4217037
+mean(season_9_no_finale$us_viewers) # 4099200
+(4099200 - 4217037) / 4099200 # -0.029
+
+### Based on the significant change each season after Michael left (36%) and (27%) in the final two seasons of the show,
+###   plus the (3%) decrease in avg viewers once the episodes with Michael are removed from the final season, I can
+###   confidently conclude Michael Scott's departure negatively impacted viewership
 
 # =============================================================================
 office <- office %>% 
