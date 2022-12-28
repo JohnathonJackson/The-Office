@@ -131,9 +131,10 @@ ggplot(office_summary, aes(x = season.x, y = avg_viewers, color = avg_viewers)) 
 
 office_summary <- office_summary %>%
   mutate(difference = avg_viewers-lag(avg_viewers, default = first(avg_viewers))) %>% # calculate value change season over season
-  mutate(pct_change = (avg_viewers - lag(avg_viewers)) / avg_viewers * 100) # calculate % change season over season
+  mutate(pct_change = (avg_viewers - lag(avg_viewers)) / avg_viewers * 100) %>% # calculate % change season over season
+  mutate(pos = pct_change >= 0) # True if positive number
 
-ggplot(office_summary, aes(x = season.x, y = pct_change, fill = pct_change)) +
+ggplot(office_summary, aes(x = season.x, y = pct_change, fill = pos)) +
   geom_col() +
   scale_x_discrete(limits = c("1", "2", "3", "4", "5", "6", "7", "8", "9")) +
   labs(title = "The Office",
@@ -179,76 +180,62 @@ mean(season_9_no_finale$us_viewers) # 4099200
 ###   confidently conclude Michael Scott's departure negatively impacted viewership
 
 # =============================================================================
-office <- office %>% 
-  mutate(recommend = if_else(imdb_rating > 8.0, "Yes", "No"))
+# Seasons & Episodes Recommended to watch
 
-ggplot(office, aes(x = recommend, fill = recommend)) +
+# Seasons
+office <- office %>% 
+  mutate(recommend = if_else(imdb_rating > 8.0, "Yes", "No")) %>%
+  mutate(recommend = as.factor(recommend))
+
+library(randomForest)
+rf <- randomForest(recommend ~ us_viewers + total_votes + imdb_rating,
+                   data = office)
+
+predicted_rf <- rf %>%
+  predict(newdata = office, type = "prob")
+
+office <- office %>%
+  mutate(glm_predict = predict(glm, newdata = office, type = "response")) %>%
+  mutate(predicted_rf = predicted_rf[, "Yes"])
+
+
+## visualize yes/no 
+ggplot(office, aes(x = recommend, fill = recommend))+
   geom_bar() +
   facet_wrap(vars(season.x)) +
-  labs(y = "Number of Episodes",
-       title = "Recommended Episodes by Season")
-### With the exception of pilot season (1), there was a switch from "Yes" to "No"
-###   starting in season 8 and continuing through season 9
+  labs(title = "The Office Season Recommendations",
+       subtitle = "based on IMDB Rating of 8.0+",
+       x = "Recommendation", y = "")
 
-# Logistic Prediction Model
-library(rsample)
-set.seed(27)
-split <- initial_split(office, prop = 0.7)
-train <- training(split)
-test <- testing(split)
-
-logistic <- glm(as.factor(recommend) ~ us_viewers + total_votes + imdb_rating,
-                data = train, family = "binomial")
-summary(logistic) 
-
-# RandomForest Prediction Model
-library(randomForest)
-rf <- randomForest(as.factor(recommend) ~ us_viewers + total_votes + imdb_rating,
-                   data = train, ntree = 1000, importance = TRUE)
-plot(rf)
-varImpPlot(rf) # indicates imdb_rating impacts the prediction accuracy the most
-
-library(cutpointr)
-test <- test %>% 
-  mutate(prediction = predict(rf, newdata = test, type = "prob") [, 2])
-
-### want to add roc for logistic & randomForest models
-
-rf_office <- randomForest(as.factor(recommend) ~ us_viewers + total_votes + imdb_rating,
-                   data = office, ntree = 1000, importance = TRUE)
-office <- office %>% 
-  mutate(prediction = predict(rf_office, newdata = office, type = "prob") [, 2])
-
-seasons <- office %>%
+## view count of yes/no
+recommend <- office %>%
   group_by(season.x) %>%
-  summarize(season_recommend_num = mean(prediction),
-            avg_viewer = mean(us_viewers)) %>%
-  mutate(season_recommend_char = if_else(season_recommend_num > 0.60, "Yes", "No"))
+  count(recommend) %>%
+  spread(recommend, n)
 
-ggplot(seasons, aes(x = season.x, y = season_recommend_num)) +
-  geom_line(color = "blue") +
+print(recommend)
+
+## episodes have a 100% recommendation
+office_episode_watch <- office %>%
+  filter(predicted_rf == 1.00)
+
+office_episode_watch[,c(1, 2, 4, 10)] # details of episodes with 100% recommendation
+
+## episodes with a 0% recommendation
+office_episode_avoid <- office %>%
+  filter(predicted_rf == 0.00)
+
+office_episode_avoid[,c(1, 2, 4, 10)] # details of episodes with 0% recommendation
+
+ggplot(office, aes(x = season.x, fill = recommend)) +
+  geom_bar() +
   scale_x_discrete(limits = c("1", "2", "3", "4", "5", "6", "7", "8", "9")) +
-  annotate("text", x = 8.1, y = 0.66, 
-           label = "Michael's Last Season") +
-  annotate("text", x = 1.6, y = 0.36, 
-           label = "Pilot Season") +
-  labs(title = "Avg Recommendation by Season",
-       subtitle = "The Office",
-       x = "Season", y = "Avg Recommendation") +
-  geom_point(color = "black")
+  labs(title = "The Office",
+       subtitle = "Recommendation by Season",
+       x = "Season", y = "") +
+  theme_minimal()
+### the latter half of the series has more 0% recommendations
 
-view(seasons)
-(.15-.65)/.65 # 0.50 (76%) decrease in recommending season 7 to season 8
-
-ggplot(seasons, aes(x = season.x, y = avg_viewer)) +
-  geom_line(color = "blue") +
-  geom_point() +
-  scale_x_discrete(limits = c("1", "2", "3", "4", "5", "6", "7", "8", "9")) +
-  labs(title = "Avg Viewers by Season", 
-       subtitle = "The Office",
-       x = "Season", y = "Avg US Viewers") +
-  annotate("text", x = 1.8, y = 6366667, label = "Pilot Season") +
-  annotate("text", x = 8.3, y = 7300385, label = "Michael's Final Season") +
-  annotate("text", x = 6.5, y = 9164000, label = "Episodes after Super Bowl")
+# =============================================================================
 
 
