@@ -113,7 +113,6 @@ mean(season_9_no_finale$imdb_rating) # 7.84
 ### Based on charts showing the drop in ratings once Michael left and the increase in ratings when 
 ###  Michael made a cameo in the finale, I feel confident to conclude ratings were impacted by his departure
 
-
 ## Viewers
 ggplot(office_summary, aes(x = season.x, y = avg_viewers, color = avg_viewers)) +
   geom_line() +
@@ -195,7 +194,6 @@ predicted_rf <- rf %>%
   predict(newdata = office, type = "prob")
 
 office <- office %>%
-  mutate(glm_predict = predict(glm, newdata = office, type = "response")) %>%
   mutate(predicted_rf = predicted_rf[, "Yes"])
 
 
